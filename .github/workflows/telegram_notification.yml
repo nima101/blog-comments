@@ -5,8 +5,8 @@ on:
   discussion:
     types: [created, edited]
   # Optional: keep if you plan to forward reaction webhooks into Actions
-  # repository_dispatch:
-  #   types: [discussion_reaction]
+  repository_dispatch:
+    types: [discussion_reaction]
 
 jobs:
   notify-telegram:
@@ -26,8 +26,14 @@ jobs:
           ACTOR="${{ github.actor }}"
           RUN_URL="https://github.com/${REPO}/actions/runs/${{ github.run_id }}"
 
-          # Default text
-          TEXT="Repository: ${REPO}\nActor: ${ACTOR}\nAction: ${ACTION}\nRun: ${RUN_URL}"
+          TEXT="Discussion ${ACTION}
+          #${DISC_NUM}: ${DISC_TITLE}
+          Category: ${CATEGORY}
+          URL: ${DISC_URL}
+          Repository: ${REPO}
+          Actor: ${ACTOR}
+          Action: ${ACTION}
+          Run: ${RUN_URL}"
 
           if [ "${EVENT_NAME}" = "discussion" ]; then
             # Pull common discussion fields
@@ -36,11 +42,11 @@ jobs:
             DISC_URL="${{ github.event.discussion.html_url }}"
             CATEGORY="${{ github.event.discussion.category.name }}"
 
-            if [ "${ACTION}" = "created" ] || [ "${ACTION}" = "edited" ]; then
-              TEXT="Discussion ${ACTION}\n#${DISC_NUM}: ${DISC_TITLE}\nCategory: ${CATEGORY}\nURL: ${DISC_URL}\n\n${TEXT}"
-            else
-              TEXT="Discussion event (${ACTION})\n#${DISC_NUM}: ${DISC_TITLE}\nURL: ${DISC_URL}\n\n${TEXT}"
-            fi
+            # if [ "${ACTION}" = "created" ] || [ "${ACTION}" = "edited" ]; then
+            #   TEXT="Discussion ${ACTION}\n#${DISC_NUM}: ${DISC_TITLE}\nCategory: ${CATEGORY}\nURL: ${DISC_URL}\n\n${TEXT}"
+            # else
+            #   TEXT="Discussion event (${ACTION})\n#${DISC_NUM}: ${DISC_TITLE}\nURL: ${DISC_URL}\n\n${TEXT}"
+            # fi
           fi
 
           if [ "${EVENT_NAME}" = "repository_dispatch" ] && [ "${ACTION}" = "discussion_reaction" ]; then
@@ -74,4 +80,4 @@ jobs:
             -d "chat_id=${TG_CHAT_ID}" \
             --data-urlencode "text=$(cat message.txt)" \
             -d "disable_web_page_preview=true" \
-            -d "parse_mode=HTML"
+            -d "parse_mode=MarkdownV2"
