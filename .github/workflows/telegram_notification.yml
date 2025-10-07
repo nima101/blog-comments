@@ -5,8 +5,8 @@ on:
   discussion:
     types: [created, edited]
   # Optional: keep if you plan to forward reaction webhooks into Actions
-  repository_dispatch:
-    types: [discussion_reaction]
+  # repository_dispatch:
+    # types: [discussion_reaction]
 
 jobs:
   notify-telegram:
