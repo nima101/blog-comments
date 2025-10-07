@@ -1,0 +1,77 @@
+# .github/workflows/telegram_message.yml
+name: telegram_message
+
+on:
+  discussion:
+    types: [created, edited]
+  # Optional: keep if you plan to forward reaction webhooks into Actions
+  # repository_dispatch:
+  #   types: [discussion_reaction]
+
+jobs:
+  notify-telegram:
+    runs-on: ubuntu-latest
+    env:
+      TG_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}   # Bot token from @BotFather
+      TG_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}   # Your user/channel/chat id
+    steps:
+      - name: Build message
+        id: msg
+        run: |
+          set -euo pipefail
+
+          EVENT_NAME="${{ github.event_name }}"
+          ACTION="${{ github.event.action }}"
+          REPO="${{ github.repository }}"
+          ACTOR="${{ github.actor }}"
+          RUN_URL="https://github.com/${REPO}/actions/runs/${{ github.run_id }}"
+
+          # Default text
+          TEXT="Repository: ${REPO}\nActor: ${ACTOR}\nAction: ${ACTION}\nRun: ${RUN_URL}"
+
+          if [ "${EVENT_NAME}" = "discussion" ]; then
+            # Pull common discussion fields
+            DISC_NUM="${{ github.event.discussion.number }}"
+            DISC_TITLE="${{ github.event.discussion.title }}"
+            DISC_URL="${{ github.event.discussion.html_url }}"
+            CATEGORY="${{ github.event.discussion.category.name }}"
+
+            if [ "${ACTION}" = "created" ] || [ "${ACTION}" = "edited" ]; then
+              TEXT="Discussion ${ACTION}\n#${DISC_NUM}: ${DISC_TITLE}\nCategory: ${CATEGORY}\nURL: ${DISC_URL}\n\n${TEXT}"
+            else
+              TEXT="Discussion event (${ACTION})\n#${DISC_NUM}: ${DISC_TITLE}\nURL: ${DISC_URL}\n\n${TEXT}"
+            fi
+          fi
+
+          if [ "${EVENT_NAME}" = "repository_dispatch" ] && [ "${ACTION}" = "discussion_reaction" ]; then
+            # Expect your dispatcher to send these in client_payload
+            SUBJECT='${{ toJson(github.event.client_payload.subject) }}'
+            SUBJECT_URL='${{ toJson(github.event.client_payload.subject_url) }}'
+            REACTION_ACTION='${{ toJson(github.event.client_payload.reaction_action) }}'
+            REACTION_CONTENT='${{ toJson(github.event.client_payload.reaction_content) }}'
+            REACTOR='${{ toJson(github.event.client_payload.reactor) }}'
+            DISCUSSION_NUMBER='${{ toJson(github.event.client_payload.discussion_number) }}'
+
+            # Strip quotes added by toJson for simple interpolation
+            SUBJECT=${SUBJECT//\"/}
+            SUBJECT_URL=${SUBJECT_URL//\"/}
+            REACTION_ACTION=${REACTION_ACTION//\"/}
+            REACTION_CONTENT=${REACTION_CONTENT//\"/}
+            REACTOR=${REACTOR//\"/}
+            DISCUSSION_NUMBER=${DISCUSSION_NUMBER//\"/}
+
+            TEXT="Discussion reaction ${REACTION_ACTION}\nOn: ${SUBJECT} #${DISCUSSION_NUMBER}\nReaction: ${REACTION_CONTENT}\nBy: ${REACTOR}\nURL: ${SUBJECT_URL}\n\n${TEXT}"
+          fi
+
+          # Save for next step
+          printf "%s" "${TEXT}" > message.txt
+
+      - name: Send Telegram message
+        run: |
+          set -euo pipefail
+          curl -fsSL \
+            "https://api.telegram.org/bot${TG_TOKEN}/sendMessage" \
+            -d "chat_id=${TG_CHAT_ID}" \
+            --data-urlencode "text=$(cat message.txt)" \
+            -d "disable_web_page_preview=true" \
+            -d "parse_mode=HTML"
