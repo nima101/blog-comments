@@ -6,6 +6,8 @@ on:
     types: [created, edited]
   discussion_comment:
     types: [created, edited]
+  repository_dispatch:
+    types: [discussion_reaction]    
 
 jobs:
   notify-telegram:
