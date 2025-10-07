@@ -4,73 +4,60 @@ name: telegram_message
 on:
   discussion:
     types: [created, edited]
-  # Optional: keep if you plan to forward reaction webhooks into Actions
-  # repository_dispatch:
-    # types: [discussion_reaction]
+  discussion_comment:
+    types: [created, edited]
 
 jobs:
   notify-telegram:
     runs-on: ubuntu-latest
     env:
-      TG_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}   # Bot token from @BotFather
-      TG_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}   # Your user/channel/chat id
+      TG_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+      TG_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
     steps:
       - name: Build message
-        id: msg
         run: |
           set -euo pipefail
 
-          EVENT_NAME="${{ github.event_name }}"
-          ACTION="${{ github.event.action }}"
           REPO="${{ github.repository }}"
           ACTOR="${{ github.actor }}"
           RUN_URL="https://github.com/${REPO}/actions/runs/${{ github.run_id }}"
+          EVENT_NAME="${{ github.event_name }}"
+          ACTION="${{ github.event.action }}"
 
-          if [ "${EVENT_NAME}" = "discussion" ]; then
-            # Pull common discussion fields
-            DISC_NUM="${{ github.event.discussion.number }}"
-            DISC_TITLE="${{ github.event.discussion.title }}"
-            DISC_URL="${{ github.event.discussion.html_url }}"
-            CATEGORY="${{ github.event.discussion.category.name }}"
+          # Pull fields from the raw webhook; missing keys become empty strings.
+          DISC_NUM="$(jq -r '.discussion.number // ""' "$GITHUB_EVENT_PATH")"
+          DISC_TITLE="$(jq -r '.discussion.title // ""' "$GITHUB_EVENT_PATH")"
+          DISC_URL="$(jq -r '.discussion.html_url // ""' "$GITHUB_EVENT_PATH")"
+          CATEGORY="$(jq -r '.discussion.category.name // ""' "$GITHUB_EVENT_PATH")"
 
-            TEXT="Discussion ${ACTION}
-            #${DISC_NUM}: ${DISC_TITLE}
-            Category: ${CATEGORY}
-            URL: ${DISC_URL}
-            Repository: ${REPO}
-            Actor: ${ACTOR}
-            Action: ${ACTION}
-            Run: ${RUN_URL}"
+          COMMENTER="$(jq -r '.comment.user.login // ""' "$GITHUB_EVENT_PATH")"
+          COMMENT_URL="$(jq -r '.comment.html_url // ""' "$GITHUB_EVENT_PATH")"
+          COMMENT_BODY="$(jq -r '.comment.body // ""' "$GITHUB_EVENT_PATH")"
 
-            # if [ "${ACTION}" = "created" ] || [ "${ACTION}" = "edited" ]; then
-            #   TEXT="Discussion ${ACTION}\n#${DISC_NUM}: ${DISC_TITLE}\nCategory: ${CATEGORY}\nURL: ${DISC_URL}\n\n${TEXT}"
-            # else
-            #   TEXT="Discussion event (${ACTION})\n#${DISC_NUM}: ${DISC_TITLE}\nURL: ${DISC_URL}\n\n${TEXT}"
-            # fi
+          # Soft truncate comment to keep under Telegram’s 4096 char limit.
+          MAX=1200
+          if [ "${#COMMENT_BODY}" -gt "$MAX" ]; then
+            COMMENT_BODY="${COMMENT_BODY:0:$MAX}…[truncated]"
           fi
 
-          if [ "${EVENT_NAME}" = "repository_dispatch" ] && [ "${ACTION}" = "discussion_reaction" ]; then
-            # Expect your dispatcher to send these in client_payload
-            SUBJECT='${{ toJson(github.event.client_payload.subject) }}'
-            SUBJECT_URL='${{ toJson(github.event.client_payload.subject_url) }}'
-            REACTION_ACTION='${{ toJson(github.event.client_payload.reaction_action) }}'
-            REACTION_CONTENT='${{ toJson(github.event.client_payload.reaction_content) }}'
-            REACTOR='${{ toJson(github.event.client_payload.reactor) }}'
-            DISCUSSION_NUMBER='${{ toJson(github.event.client_payload.discussion_number) }}'
+          TEXT="Event: ${EVENT_NAME} / ${ACTION}
+                Discussion #${DISC_NUM}: ${DISC_TITLE}
+                Category: ${CATEGORY}
+                Discussion URL: ${DISC_URL}
+                
+                Commenter: ${COMMENTER}
+                Comment URL: ${COMMENT_URL}
+                Comment:
+                ${COMMENT_BODY}
+                
+                Repository: ${REPO}
+                Trigger actor: ${ACTOR}
+                Run: ${RUN_URL}
+                "
 
-            # Strip quotes added by toJson for simple interpolation
-            SUBJECT=${SUBJECT//\"/}
-            SUBJECT_URL=${SUBJECT_URL//\"/}
-            REACTION_ACTION=${REACTION_ACTION//\"/}
-            REACTION_CONTENT=${REACTION_CONTENT//\"/}
-            REACTOR=${REACTOR//\"/}
-            DISCUSSION_NUMBER=${DISCUSSION_NUMBER//\"/}
-
-            TEXT="Discussion reaction ${REACTION_ACTION}\nOn: ${SUBJECT} #${DISCUSSION_NUMBER}\nReaction: ${REACTION_CONTENT}\nBy: ${REACTOR}\nURL: ${SUBJECT_URL}\n\n${TEXT}"
-          fi
-
-          # Save for next step
           printf "%s" "${TEXT}" > message.txt
+          echo "--- message.txt preview ---"
+          sed -n '1,120p' message.txt
 
       - name: Send Telegram message
         run: |
@@ -79,5 +66,4 @@ jobs:
             "https://api.telegram.org/bot${TG_TOKEN}/sendMessage" \
             -d "chat_id=${TG_CHAT_ID}" \
             --data-urlencode "text=$(cat message.txt)" \
-            -d "disable_web_page_preview=true" \
-            # -d "parse_mode=MarkdownV2"
+            -d "disable_web_page_preview=true"
