@@ -40,20 +40,21 @@ jobs:
             COMMENT_BODY="${COMMENT_BODY:0:$MAX}…[truncated]"
           fi
 
-          TEXT="Event: ${EVENT_NAME} / ${ACTION}
-                Discussion #${DISC_NUM}: ${DISC_TITLE}
-                Category: ${CATEGORY}
-                Discussion URL: ${DISC_URL}
-                
-                Commenter: ${COMMENTER}
-                Comment URL: ${COMMENT_URL}
-                Comment:
-                ${COMMENT_BODY}
-                
-                Repository: ${REPO}
-                Trigger actor: ${ACTOR}
-                Run: ${RUN_URL}
-                "
+          TEXT="
+          Event: ${EVENT_NAME} / ${ACTION}
+          Discussion #${DISC_NUM}: ${DISC_TITLE}
+          Category: ${CATEGORY}
+          Discussion URL: ${DISC_URL}
+          
+          Commenter: ${COMMENTER}
+          Comment URL: ${COMMENT_URL}
+          Comment:
+          ${COMMENT_BODY}
+          
+          Repository: ${REPO}
+          Trigger actor: ${ACTOR}
+          Run: ${RUN_URL}
+          "
 
           printf "%s" "${TEXT}" > message.txt
           echo "--- message.txt preview ---"
