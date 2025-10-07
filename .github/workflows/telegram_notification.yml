@@ -26,21 +26,21 @@ jobs:
           ACTOR="${{ github.actor }}"
           RUN_URL="https://github.com/${REPO}/actions/runs/${{ github.run_id }}"
 
-          TEXT="Discussion ${ACTION}
-          #${DISC_NUM}: ${DISC_TITLE}
-          Category: ${CATEGORY}
-          URL: ${DISC_URL}
-          Repository: ${REPO}
-          Actor: ${ACTOR}
-          Action: ${ACTION}
-          Run: ${RUN_URL}"
-
           if [ "${EVENT_NAME}" = "discussion" ]; then
             # Pull common discussion fields
             DISC_NUM="${{ github.event.discussion.number }}"
             DISC_TITLE="${{ github.event.discussion.title }}"
             DISC_URL="${{ github.event.discussion.html_url }}"
             CATEGORY="${{ github.event.discussion.category.name }}"
+
+            TEXT="Discussion ${ACTION}
+            #${DISC_NUM}: ${DISC_TITLE}
+            Category: ${CATEGORY}
+            URL: ${DISC_URL}
+            Repository: ${REPO}
+            Actor: ${ACTOR}
+            Action: ${ACTION}
+            Run: ${RUN_URL}"
 
             # if [ "${ACTION}" = "created" ] || [ "${ACTION}" = "edited" ]; then
             #   TEXT="Discussion ${ACTION}\n#${DISC_NUM}: ${DISC_TITLE}\nCategory: ${CATEGORY}\nURL: ${DISC_URL}\n\n${TEXT}"
@@ -80,4 +80,4 @@ jobs:
             -d "chat_id=${TG_CHAT_ID}" \
             --data-urlencode "text=$(cat message.txt)" \
             -d "disable_web_page_preview=true" \
-            -d "parse_mode=MarkdownV2"
+            # -d "parse_mode=MarkdownV2"
